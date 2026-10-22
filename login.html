@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar · I COPINHA ASDOKS</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body class="loginpg">
+<div class="login">
+  <img src="assets/logo.png" alt="ASDOKS">
+  <h1>I COPINHA ASDOKS</h1>
+  <div class="seg"><button id="tEntrar" class="on" onclick="setModo('entrar')">Entrar</button><button id="tCriar" onclick="setModo('criar')">Criar conta</button></div>
+  <div id="boxNome" style="display:none"><label>Nome</label><input id="nome" autocomplete="name"></div>
+  <label>E-mail</label><input id="email" type="email" autocomplete="email">
+  <label>Senha</label><input id="senha" type="password" autocomplete="current-password">
+  <button class="btn" id="ok" onclick="enviar()">Entrar</button>
+  <p id="msg" class="hint"></p>
+  <p class="hint">Contas novas podem apenas cadastrar atletas.</p>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/login.js"></script>
+</body>
+</html>

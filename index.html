@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I COPINHA ASDOKS</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<aside class="side">
+  <div class="brand"><img src="assets/logo.png" alt="ASDOKS"><h1>I COPINHA ASDOKS</h1></div>
+  <nav>
+    <button data-v="cadastro" onclick="go('cadastro')">📝 Cadastro</button>
+    <button data-v="categorias" data-adm onclick="go('categorias')">🏷️ Categorias</button>
+    <button data-v="sumulas" data-adm onclick="go('sumulas')">📄 Súmulas</button>
+  </nav>
+  <div class="user"><b id="uNome"></b><span id="uRole"></span><button onclick="sair()">Sair</button></div>
+</aside>
+<main id="view"></main>
+<div id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/bracket.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
