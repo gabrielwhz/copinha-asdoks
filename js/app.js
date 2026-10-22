@@ -29,7 +29,7 @@ function vCadastro(){return `<h2>Cadastro de atletas</h2>
  <div><label>Categoria</label><select id="cat"></select></div>
 </div>
 <p class="hint" id="dica"></p>
-<div class="bar"><button class="btn" onclick="add()">Cadastrar atleta</button>${isAdmin()?`<button class="btn alt" onclick="demo()">Gerar atletas de teste</button><button class="btn alt" onclick="limpar()">Limpar tudo</button>`:""}</div></div>
+<div class="bar"><button class="btn" onclick="add()">Cadastrar atleta</button>${isAdmin()?`<button class="btn alt" onclick="gerarTabelaPDF()">Gerar tabela de atletas (PDF)</button><button class="btn alt" onclick="limpar()">Limpar tudo</button>`:""}</div></div>
 <div class="card"><h3>${isAdmin()?"Atletas cadastrados":"Atletas que você cadastrou"} (<span id="qtd">0</span>)</h3><div class="tbl" id="lista"></div></div>`}
 
 function fillCat(){
@@ -62,12 +62,40 @@ async function limpar(){
   const r=await dbClear();if(r.error){alert(r.error.message);return}
   S.atl=[];S.draws={};lista();
 }
-async function demo(){
-  const N=["Carlos","Gabriel","Tiago","Luiz","Ney","Jean","Lucas","Ângelo","Marcos","Mateus","Alan","Diego"],A=["APK","Reigui","Arte","LVG","LFC","SAJ"],rows=[];
-  N.forEach((n,i)=>{const sexo=i%3?"M":"F",idade=7+Math.floor(Math.random()*8),grad=GRADS[Math.floor(Math.random()*5)],c=acharCat(i%2?"kumite":"kata",sexo,idade,grad);
-    if(c)rows.push({nome:n+" Teste",idade,sexo,grad,acad:A[i%6],cod:c.cod})});
-  const r=await dbAddMany(rows);if(r.error){alert(r.error.message);return}
-  S.atl.push(...r.data);rows.forEach(x=>delete S.draws[x.cod]);lista();toast("Atletas de teste criados");
+function logoDataURL(){return new Promise(res=>{const i=new Image();
+  i.onload=()=>{try{const c=document.createElement("canvas");c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext("2d").drawImage(i,0,0);res({d:c.toDataURL("image/png"),w:i.naturalWidth,h:i.naturalHeight})}catch(e){res(null)}};
+  i.onerror=()=>res(null);i.src="assets/logo.png"})}
+
+// Tabela com todos os atletas, separada por categoria (somente admin) - baixa em PDF
+async function gerarTabelaPDF(){
+  if(!isAdmin())return;
+  if(!window.jspdf){alert("A biblioteca de PDF não carregou. Verifique a internet.");return}
+  await carregar();
+  const cats=CATEGORIAS.filter(c=>atletasDe(c.cod).length);
+  if(!cats.length){alert("Nenhum atleta cadastrado.");return}
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"}),lg=await logoDataURL();
+  let x=14;
+  if(lg){const h=20,w=h*lg.w/lg.h;doc.addImage(lg.d,"PNG",14,8,w,h);x=14+w+4}
+  doc.setFont("helvetica","bold").setFontSize(16).setTextColor(14,47,90).text("I COPINHA ASDOKS",x,17);
+  doc.setFont("helvetica","normal").setFontSize(10).setTextColor(90,90,90).text(`Lista de atletas por categoria - ${S.atl.length} atletas - ${new Date().toLocaleDateString("pt-BR")}`,x,24);
+  let y=34;
+  cats.forEach(c=>{
+    if(y>255){doc.addPage();y=16}
+    const at=atletasDe(c.cod).slice().sort((a,b)=>a.nome.localeCompare(b.nome));
+    doc.setFillColor(31,102,176).rect(14,y,182,8,"F");
+    doc.setFont("helvetica","bold").setFontSize(10).setTextColor(255,255,255)
+      .text(`${MODNOME[c.mod].toUpperCase()} ${SEXNOME[c.sexo].toUpperCase()} - COD ${c.cod} - ${nomeCat(c).replace(" · "," - ")}`,16,y+5.5)
+      .text(`${at.length} atleta(s)`,194,y+5.5,{align:"right"});
+    doc.autoTable({startY:y+8,margin:{left:14,right:14},theme:"grid",rowPageBreak:"avoid",
+      styles:{fontSize:9,cellPadding:1.8,textColor:[26,36,51]},headStyles:{fillColor:[230,238,248],textColor:[14,47,90]},
+      head:[["Nº","Nome","Idade","Faixa","Academia / equipe"]],
+      body:at.map((a,i)=>[i+1,a.nome,a.idade,a.grad,a.acad||""]),
+      columnStyles:{0:{cellWidth:10},2:{cellWidth:16},3:{cellWidth:26}}});
+    y=doc.lastAutoTable.finalY+8;
+  });
+  const n=doc.getNumberOfPages();
+  for(let i=1;i<=n;i++){doc.setPage(i);doc.setFont("helvetica","normal").setFontSize(8).setTextColor(120,120,120).text(`Página ${i} de ${n}`,105,290,{align:"center"})}
+  doc.save("atletas-copinha-asdoks.pdf");
 }
 
 /* ---------- SÚMULA / CHAVE ---------- */
