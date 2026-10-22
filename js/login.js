@@ -1,8 +1,13 @@
 const $ = s => document.querySelector(s);
 let modo = "entrar";
 if (SUPABASE_URL.startsWith("COLE")) $("#msg").textContent = "Configure js/config.js com as chaves do Supabase.";
+const saiu = new URLSearchParams(location.search).has("saiu");
+if (saiu) {   // veio do botão Sair: limpa qualquer sessão antes de criar o cliente
+  [localStorage, sessionStorage].forEach(s => Object.keys(s).filter(k => k.startsWith("sb-")).forEach(k => s.removeItem(k)));
+  history.replaceState(null, "", "login.html");
+}
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-db.auth.getSession().then(({ data }) => { if (data.session) location.href = "index.html"; });
+if (!saiu) db.auth.getSession().then(({ data }) => { if (data.session) location.href = "index.html"; });
 
 function setModo(m) {
   modo = m;

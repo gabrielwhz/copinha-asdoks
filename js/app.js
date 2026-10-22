@@ -141,7 +141,12 @@ function vSumulas(){
 
 /* ---------- LOGIN / PERFIL ---------- */
 const isAdmin=()=>ME&&ME.role=="admin";
-async function sair(){await db.auth.signOut();location.href="login.html"}
+function limparSessao(){[localStorage,sessionStorage].forEach(s=>Object.keys(s).filter(k=>k.startsWith("sb-")).forEach(k=>s.removeItem(k)))}
+async function sair(){
+  try{await db.auth.signOut()}catch(e){}
+  limparSessao();                       // garante o logout mesmo se a chamada ao servidor falhar
+  location.replace("login.html?saiu=1");
+}
 async function init(){
   if(SUPABASE_URL.startsWith("COLE")){location.href="login.html";return}
   const {data:{session}}=await db.auth.getSession();
