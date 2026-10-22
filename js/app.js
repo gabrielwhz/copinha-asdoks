@@ -105,7 +105,17 @@ function sheet(cod){
   <div class="sig">ÁRBITROS: ________________; ________________; ________________; ________________; ________________;<br>MESÁRIOS: ________________; ________________; ________________;</div></div>`;
 }
 function painel(cod){const d=S.draws[cod];
-  return `<div class="bar"><button class="btn" onclick="sorteio(${cod})">${d?"Sortear novamente":"Sortear chave"}</button><button class="btn alt" onclick="window.print()" ${d?"":"disabled"}>Imprimir / PDF</button><button class="btn alt" onclick="baixar(${cod})" ${d?"":"disabled"}>Baixar chave (SVG)</button></div>`+sheet(cod)}
+  return `<div class="bar"><button class="btn" onclick="sorteio(${cod})">${d?"Sortear novamente":"Sortear chave"}</button><button class="btn alt" onclick="imprimir(${cod})" ${d?"":"disabled"}>Imprimir / PDF</button><button class="btn alt" onclick="baixar(${cod})" ${d?"":"disabled"}>Baixar chave (SVG)</button></div>`+sheet(cod)}
+// Nome do arquivo = nome da categoria. No PDF, o navegador usa o título da página como nome sugerido.
+function nomeArquivo(cod){
+  const c=catDe(cod);
+  return `${MODNOME[c.mod]} ${SEXNOME[c.sexo]} - ${nomeCat(c).replace(" · "," - ")} - Cod ${c.cod}`.replace(/[\\/:*?"<>|]/g,"");
+}
+function imprimir(cod){
+  const antigo=document.title;document.title=nomeArquivo(cod);
+  window.addEventListener("afterprint",()=>{document.title=antigo},{once:true});
+  window.print();
+}
 async function sorteio(cod){
   const ids=atletasDe(cod).map(a=>a.id);
   if(ids.length<2){alert("São necessários ao menos 2 atletas nesta categoria.");return}
@@ -116,7 +126,7 @@ async function sorteio(cod){
 function baixar(cod){
   const s=$("#svg");if(!s)return;
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([s.outerHTML],{type:"image/svg+xml"}));
-  a.download=`chave-cod-${cod}.svg`;a.click();
+  a.download=nomeArquivo(cod)+".svg";a.click();
 }
 
 /* ---------- CATEGORIAS ---------- */
