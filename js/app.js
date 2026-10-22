@@ -30,7 +30,7 @@ function vCadastro(){return `<h2>Cadastro de atletas</h2>
  <div><label>Categoria</label><select id="cat"></select></div>
 </div>
 <p class="hint" id="dica"></p>
-<div class="bar"><button class="btn" onclick="add()">Cadastrar atleta</button>${isAdmin()?`<button class="btn alt" onclick="gerarTabelaPDF()">Gerar tabela de atletas (PDF)</button><button class="btn alt" onclick="limpar()">Limpar tudo</button>`:""}</div></div>
+<div class="bar"><button class="btn" onclick="add()">Cadastrar atleta</button>${isAdmin()?`<button class="btn alt" onclick="gerarTabelaPDF()">Gerar tabela de atletas (PDF)</button>`:""}</div></div>
 <div class="card"><h3>${isAdmin()?"Atletas cadastrados":"Atletas que você cadastrou"} (<span id="qtd">0</span>)</h3><div class="tbl" id="lista"></div></div>`}
 
 function fillCat(){
@@ -57,11 +57,6 @@ async function del(id){
   const a=S.atl.find(x=>x.id==id),r=await dbDel(id);
   if(r.error){alert(r.error.message);return}
   if(a)delete S.draws[a.cod];S.atl=S.atl.filter(x=>x.id!=id);lista();
-}
-async function limpar(){
-  if(!confirm("Apagar todos os atletas e sorteios?"))return;
-  const r=await dbClear();if(r.error){alert(r.error.message);return}
-  S.atl=[];S.draws={};lista();
 }
 function logoDataURL(){return new Promise(res=>{const i=new Image();
   i.onload=()=>{try{const c=document.createElement("canvas");c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext("2d").drawImage(i,0,0);res({d:c.toDataURL("image/png"),w:i.naturalWidth,h:i.naturalHeight})}catch(e){res(null)}};
@@ -116,7 +111,7 @@ async function sorteio(cod){
   if(ids.length<2){alert("São necessários ao menos 2 atletas nesta categoria.");return}
   const p=sortear(ids),r=await dbSaveDraw(cod,p);
   if(r.error){alert(r.error.message);return}
-  S.draws[cod]=p;render();toast(`Chave do Cód ${cod} enviada para Categorias`,cur.view=="sumulas");
+  S.draws[cod]=p;render();toast(`Chave do Cód ${cod} sorteada`);
 }
 function baixar(cod){
   const s=$("#svg");if(!s)return;
@@ -127,17 +122,16 @@ function baixar(cod){
 /* ---------- CATEGORIAS ---------- */
 function vCategorias(){
   const lista=CATEGORIAS.filter(c=>c.mod==cur.mod);
-  const grupo=s=>`<h4>${SEXNOME[s]}</h4>`+lista.filter(c=>c.sexo==s).map(c=>`<button class="cat ${c.cod==cur.cod?"on":""}" onclick="setCod(${c.cod})"><b>Cód ${c.cod}</b><span>${nomeCat(c)}</span><i class="${S.draws[c.cod]?"ok":""}">${atletasDe(c.cod).length}${S.draws[c.cod]?" ✓":""}</i></button>`).join("");
+  const grupo=s=>`<h4>${SEXNOME[s]}</h4>`+lista.filter(c=>c.sexo==s).map(c=>`<button class="cat ${c.cod==cur.cod?"on":""}" onclick="setCod(${c.cod})"><b>Cód ${c.cod}</b><span>${nomeCat(c)}</span><i>${atletasDe(c.cod).length}</i></button>`).join("");
   const at=atletasDe(cur.cod);
   return `<h2>Categorias</h2>${seg()}<div class="split"><div class="cats">${grupo("M")}${grupo("F")}</div><div>
-  <div class="card"><h3>${esc(tituloCat(catDe(cur.cod)))} — ${at.length} atleta(s)</h3><div class="tbl">${at.length?`<table><tr><th>Nome</th><th>Idade</th><th>Faixa</th><th>Academia</th></tr>${at.map(a=>`<tr><td>${esc(a.nome)}</td><td>${a.idade}</td><td>${a.grad}</td><td>${esc(a.acad)}</td></tr>`).join("")}</table>`:`<div class="empty">Nenhum atleta nesta categoria.</div>`}</div></div>
-  ${painel(cur.cod)}</div></div>`;
+  <div class="card"><h3>${esc(tituloCat(catDe(cur.cod)))} — ${at.length} atleta(s)</h3><div class="tbl">${at.length?`<table><tr><th>Nome</th><th>Idade</th><th>Faixa</th><th>Academia</th></tr>${at.map(a=>`<tr><td>${esc(a.nome)}</td><td>${a.idade}</td><td>${a.grad}</td><td>${esc(a.acad)}</td></tr>`).join("")}</table>`:`<div class="empty">Nenhum atleta nesta categoria.</div>`}</div></div></div></div>`;
 }
 
 /* ---------- SÚMULAS ---------- */
 function vSumulas(){
   return `<h2>Geração de súmulas</h2>${seg()}<div class="card"><label>Categoria</label><select onchange="setCod(this.value)">${CATEGORIAS.filter(c=>c.mod==cur.mod).map(c=>`<option value="${c.cod}" ${c.cod==cur.cod?"selected":""}>${SEXNOME[c.sexo]} · Cód ${c.cod} · ${nomeCat(c)} (${atletasDe(c.cod).length} atletas)${S.draws[c.cod]?" ✓":""}</option>`).join("")}</select>
-  <p class="hint">Ao sortear, a chave é enviada automaticamente para a aba Categorias.</p></div>${painel(cur.cod)}`;
+  <p class="hint">As chaves sorteadas ficam salvas no sistema.</p></div>${painel(cur.cod)}`;
 }
 
 /* ---------- LOGIN / PERFIL ---------- */
