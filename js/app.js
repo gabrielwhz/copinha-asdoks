@@ -1,4 +1,4 @@
-console.log("ASDOKS build 4");
+console.log("ASDOKS build 5");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
@@ -26,66 +26,97 @@ function vCadastro(){return `<h2>Cadastro de atletas</h2>
  <div><label>Sexo</label><select id="sexo" onchange="fillCat()"><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
  <div><label>Graduação (faixa)</label><select id="grad" onchange="fillCat()">${GRADS.map(g=>`<option>${g}</option>`).join("")}</select></div>
  <div><label>Academia / equipe</label><input id="acad"></div>
- <div><label>Modalidade</label><select id="mod" onchange="fillCat()"><option value="kata">Kata</option><option value="kumite">Kumitê</option></select></div>
- <div><label>Categoria</label><select id="cat"></select></div>
+ <div><label>Modalidade</label><select id="mod" onchange="fillCat()"><option value="kata">Kata</option><option value="kumite">Kumitê</option><option value="ambas">Kata e Kumitê</option></select></div>
+ <div id="boxKata"><label>Categoria de Kata</label><select id="catKata"></select></div>
+ <div id="boxKumite"><label>Categoria de Kumitê</label><select id="catKumite"></select></div>
 </div>
 <p class="hint" id="dica"></p>
 <div class="bar"><button class="btn" onclick="add()">Cadastrar atleta</button>${isAdmin()?`<button class="btn alt" onclick="gerarTabelaPDF()">Gerar tabela de atletas (PDF)</button>`:""}</div></div>
 <div class="card"><h3>${isAdmin()?"Atletas cadastrados":"Atletas que você cadastrou"} (<span id="qtd">0</span>)</h3><div class="tbl" id="lista"></div></div>`}
 
 function fillCat(){
-  const mod=$("#mod").value,sexo=$("#sexo").value,idade=+$("#idade").value,grad=$("#grad").value,sel=$("#cat");
-  const m=idade?acharCat(mod,sexo,idade,grad):null,old=sel.value;
-  sel.innerHTML=CATEGORIAS.filter(c=>c.mod==mod&&c.sexo==sexo).map(c=>`<option value="${c.cod}">Cód ${c.cod} - ${nomeCat(c)}</option>`).join("");
-  sel.value=m?m.cod:(old&&sel.querySelector(`option[value="${old}"]`)?old:sel.options[0].value);
-  $("#dica").textContent=!idade?"Informe a idade para sugerir a categoria automaticamente.":m?`Categoria sugerida: Cód ${m.cod}.`:"Nenhuma categoria compatível com essa idade/faixa. Escolha manualmente.";
+  const mod=$("#mod").value,sexo=$("#sexo").value,idade=+$("#idade").value,grad=$("#grad").value,dica=[];
+  ["kata","kumite"].forEach(m=>{
+    const sel=$(m=="kata"?"#catKata":"#catKumite"),box=$(m=="kata"?"#boxKata":"#boxKumite"),on=mod==m||mod=="ambas";
+    box.style.display=on?"":"none";
+    const x=idade?acharCat(m,sexo,idade,grad):null,old=sel.value;
+    sel.innerHTML=CATEGORIAS.filter(c=>c.mod==m&&c.sexo==sexo).map(c=>`<option value="${c.cod}">Cód ${c.cod} - ${nomeCat(c)}</option>`).join("");
+    sel.value=x?x.cod:(old&&sel.querySelector(`option[value="${old}"]`)?old:sel.options[0].value);
+    if(on&&idade)dica.push(x?`${MODNOME[m]}: Cód ${x.cod}`:`${MODNOME[m]}: nenhuma categoria compatível, escolha manualmente`);
+  });
+  $("#dica").textContent=idade?"Sugerido - "+dica.join(" | "):"Informe a idade para sugerir as categorias automaticamente.";
 }
+const norm=s=>String(s||"").trim().toLowerCase();
+const modTxt=a=>a.kata_cod&&a.kumite_cod?"KATA E KUMITÊ":a.kata_cod?"KATA":"KUMITÊ";
+function limpaChaves(...cods){cods.forEach(c=>{if(c)delete S.draws[c]})}
+
 async function add(){
   const nome=$("#nome").value.trim(),idade=+$("#idade").value;
   if(!nome||!idade){alert("Preencha nome e idade.");return}
-  const cod=+$("#cat").value;
-  const r=await dbAdd({nome,idade,sexo:$("#sexo").value,grad:$("#grad").value,acad:$("#acad").value.trim(),cod});
+  const mod=$("#mod").value,sexo=$("#sexo").value,grad=$("#grad").value,acad=$("#acad").value.trim();
+  const kata=mod!="kumite"?+$("#catKata").value:null,kumite=mod!="kata"?+$("#catKumite").value:null;
+  // atleta já cadastrado? (mesmo nome, sexo, idade e faixa) -> adiciona a modalidade que falta, sem duplicar
+  const ex=S.atl.find(a=>norm(a.nome)==norm(nome)&&a.sexo==sexo&&a.idade==idade&&a.grad==grad);
+  if(ex){
+    const falta={};
+    if(kata&&!ex.kata_cod)falta.kata_cod=kata;
+    if(kumite&&!ex.kumite_cod)falta.kumite_cod=kumite;
+    if(!Object.keys(falta).length){alert(`${ex.nome} já está cadastrado em ${modTxt(ex)}.`);return}
+    if(!confirm(`${ex.nome} já está cadastrado em ${modTxt(ex)}.\nAdicionar ${falta.kata_cod?"Kata":"Kumitê"} a esse cadastro?`))return;
+    const r=await dbUpdate(ex.id,falta);
+    if(r.error){alert(r.error.message);return}
+    Object.assign(ex,r.data);limpaChaves(falta.kata_cod,falta.kumite_cod);
+    $("#nome").value="";lista();toast("Modalidade adicionada ao atleta");return;
+  }
+  const r=await dbAdd({nome,idade,sexo,grad,acad,kata_cod:kata,kumite_cod:kumite});
   if(r.error){alert(r.error.message);return}
-  S.atl.push(r.data);delete S.draws[cod];$("#nome").value="";$("#nome").focus();lista();toast("Atleta cadastrado");
+  S.atl.push(r.data);limpaChaves(kata,kumite);
+  $("#nome").value="";$("#nome").focus();lista();toast("Atleta cadastrado");
 }
 function lista(){
-  $("#qtd").textContent=S.atl.length;
+  $("#qtd").textContent=S.atl.length;   // cada atleta conta UMA vez, mesmo em Kata e Kumitê
   $("#lista").innerHTML=S.atl.length?`<table><tr><th>Nome</th><th>Idade</th><th>Sexo</th><th>Faixa</th><th>Academia</th><th>Modalidade</th><th>Cód</th><th></th></tr>`+
-   S.atl.slice().sort((a,b)=>a.cod-b.cod||a.nome.localeCompare(b.nome)).map(a=>`<tr><td>${esc(a.nome)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad)}</td><td>${MODNOME[catDe(a.cod).mod]}</td><td>${a.cod}</td><td><button class="x" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
+   S.atl.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(a=>`<tr><td>${esc(a.nome)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td><td>${modTxt(a)}</td><td>${[a.kata_cod,a.kumite_cod].filter(Boolean).join(" / ")}</td><td><button class="x" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
 }
 async function del(id){
-  const a=S.atl.find(x=>x.id==id),r=await dbDel(id);
+  const a=S.atl.find(x=>x.id==id);
+  if(!a||!confirm(`Remover ${a.nome}?`))return;
+  const r=await dbDel(id);
   if(r.error){alert(r.error.message);return}
-  if(a)delete S.draws[a.cod];S.atl=S.atl.filter(x=>x.id!=id);lista();
+  limpaChaves(a.kata_cod,a.kumite_cod);S.atl=S.atl.filter(x=>x.id!=id);lista();
 }
+
 function logoDataURL(){return new Promise(res=>{const i=new Image();
   i.onload=()=>{try{const c=document.createElement("canvas");c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext("2d").drawImage(i,0,0);res({d:c.toDataURL("image/png"),w:i.naturalWidth,h:i.naturalHeight})}catch(e){res(null)}};
   i.onerror=()=>res(null);i.src="assets/logo.png"})}
 
-// Tabela com todos os atletas, separada por categoria (somente admin) - baixa em PDF
+// Tabela com todos os atletas, separada por divisão de idade e faixa (vale para Kata e Kumitê) - somente admin
 async function gerarTabelaPDF(){
   if(!isAdmin())return;
   if(!window.jspdf){alert("A biblioteca de PDF não carregou. Verifique a internet.");return}
   await carregar();
-  const cats=CATEGORIAS.filter(c=>atletasDe(c.cod).length);
-  if(!cats.length){alert("Nenhum atleta cadastrado.");return}
+  if(!S.atl.length){alert("Nenhum atleta cadastrado.");return}
+  const grupos={};
+  S.atl.forEach(a=>{const d=divisao(a);(grupos[d.ord]=grupos[d.ord]||{d,lista:[]}).lista.push(a)});
+  const secoes=Object.values(grupos).sort((x,y)=>x.d.ord-y.d.ord);
+  const obs=a=>a.kata_cod&&a.kumite_cod?"":a.kata_cod?"  (somente Kata)":"  (somente Kumitê)";
   const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"}),lg=await logoDataURL();
   let x=14;
   if(lg){const h=20,w=h*lg.w/lg.h;doc.addImage(lg.d,"PNG",14,8,w,h);x=14+w+4}
   doc.setFont("helvetica","bold").setFontSize(16).setTextColor(14,47,90).text("I COPINHA ASDOKS",x,17);
-  doc.setFont("helvetica","normal").setFontSize(10).setTextColor(90,90,90).text(`Lista de atletas por categoria - ${S.atl.length} atletas - ${new Date().toLocaleDateString("pt-BR")}`,x,24);
+  doc.setFont("helvetica","normal").setFontSize(10).setTextColor(90,90,90).text(`Lista de atletas por idade e faixa - ${S.atl.length} atletas - ${new Date().toLocaleDateString("pt-BR")}`,x,24);
   let y=34;
-  cats.forEach(c=>{
+  secoes.forEach(s=>{
     if(y>255){doc.addPage();y=16}
-    const at=atletasDe(c.cod).slice().sort((a,b)=>a.nome.localeCompare(b.nome));
+    const at=s.lista.slice().sort((a,b)=>a.nome.localeCompare(b.nome));
     doc.setFillColor(31,102,176).rect(14,y,182,8,"F");
     doc.setFont("helvetica","bold").setFontSize(10).setTextColor(255,255,255)
-      .text(`${MODNOME[c.mod].toUpperCase()} ${SEXNOME[c.sexo].toUpperCase()} - COD ${c.cod} - ${nomeCat(c).replace(" · "," - ")}`,16,y+5.5)
+      .text(s.d.titulo.toUpperCase(),16,y+5.5)
       .text(`${at.length} atleta(s)`,194,y+5.5,{align:"right"});
     doc.autoTable({startY:y+8,margin:{left:14,right:14},theme:"grid",rowPageBreak:"avoid",
       styles:{fontSize:9,cellPadding:1.8,textColor:[26,36,51]},headStyles:{fillColor:[230,238,248],textColor:[14,47,90]},
       head:[["Nº","Nome","Idade","Faixa","Academia / equipe"]],
-      body:at.map((a,i)=>[i+1,a.nome,a.idade,a.grad,a.acad||""]),
+      body:at.map((a,i)=>[i+1,a.nome+obs(a),a.idade,a.grad,a.acad||""]),
       columnStyles:{0:{cellWidth:10},2:{cellWidth:16},3:{cellWidth:26}}});
     y=doc.lastAutoTable.finalY+8;
   });

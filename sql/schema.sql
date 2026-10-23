@@ -18,7 +18,9 @@ create table public.atletas (
   sexo char(1) not null check (sexo in ('M','F')),
   grad text not null,
   acad text,
-  cod int not null check (cod between 1 and 32),   -- código da categoria
+  kata_cod int check (kata_cod between 1 and 14),     -- categoria de Kata (vazio = não participa)
+  kumite_cod int check (kumite_cod between 15 and 32), -- categoria de Kumitê (vazio = não participa)
+  check (kata_cod is not null or kumite_cod is not null),
   created_by uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz default now()
 );
@@ -46,15 +48,26 @@ end $$;
 create trigger on_auth_user_created after insert on auth.users
 for each row execute function public.handle_new_user();
 
--- se um atleta entra ou sai, a chave da categoria é apagada (precisa sortear de novo)
+-- se um atleta entra, sai ou muda de categoria, só as chaves afetadas são apagadas (precisa sortear de novo)
 create function public.limpar_chave() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if tg_op = 'DELETE' then delete from public.chaves where cod = old.cod;
-  else delete from public.chaves where cod = new.cod; end if;
+  if tg_op = 'DELETE' then
+    delete from public.chaves where cod in (old.kata_cod, old.kumite_cod);
+  elsif tg_op = 'INSERT' then
+    delete from public.chaves where cod in (new.kata_cod, new.kumite_cod);
+  else
+    if new.kata_cod is distinct from old.kata_cod then
+      delete from public.chaves where cod in (old.kata_cod, new.kata_cod);
+    end if;
+    if new.kumite_cod is distinct from old.kumite_cod then
+      delete from public.chaves where cod in (old.kumite_cod, new.kumite_cod);
+    end if;
+  end if;
   return null;
 end $$;
-create trigger atletas_limpa_chave after insert or delete on public.atletas
+create trigger atletas_limpa_chave
+after insert or delete or update of kata_cod, kumite_cod on public.atletas
 for each row execute function public.limpar_chave();
 
 -- 3) SEGURANÇA (RLS) ---------------------------------------------------
@@ -69,7 +82,7 @@ create policy profiles_update on public.profiles for update using (public.is_adm
 -- atletas: usuário comum cadastra e vê/remove só os SEUS; admin faz tudo
 create policy atletas_select on public.atletas for select using (created_by = auth.uid() or public.is_admin());
 create policy atletas_insert on public.atletas for insert with check (created_by = auth.uid());
-create policy atletas_update on public.atletas for update using (public.is_admin()) with check (public.is_admin());
+create policy atletas_update on public.atletas for update using (created_by = auth.uid() or public.is_admin()) with check (created_by = auth.uid() or public.is_admin());
 create policy atletas_delete on public.atletas for delete using (created_by = auth.uid() or public.is_admin());
 
 -- chaves: somente admin

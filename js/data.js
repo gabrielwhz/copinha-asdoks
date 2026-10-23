@@ -20,3 +20,13 @@ function acharCat(mod,sexo,idade,grad){
   const g=GRADS.indexOf(grad);
   return CATEGORIAS.find(c=>c.mod==mod&&c.sexo==sexo&&idade>=c.amin&&idade<=c.amax&&g>=c.gmin&&g<=c.gmax);
 }
+
+// Divisões da tabela geral: idade e faixa, valem para Kata e Kumitê.
+// Cada divisão cabe inteira dentro de UMA categoria de Kata e de UMA de Kumitê.
+const DIV_IDADE=[[0,6,"Até 6 anos"],[7,7,"7 anos"],[8,8,"8 anos"],[9,10,"9 e 10 anos"],[11,12,"11 e 12 anos"],[13,14,"13 e 14 anos"]];
+const DIV_FAIXA=[["Branca",0,0],["Amarela",1,1],["Vermelha",2,2],["Laranja acima",3,7]];
+function divisao(a){
+  let i=DIV_IDADE.findIndex(d=>a.idade>=d[0]&&a.idade<=d[1]);const il=i<0?"15 anos ou mais":DIV_IDADE[i][2];if(i<0)i=DIV_IDADE.length;
+  const g=GRADS.indexOf(a.grad);let f=DIV_FAIXA.findIndex(d=>g>=d[1]&&g<=d[2]);if(f<0)f=DIV_FAIXA.length-1;
+  return{ord:(a.sexo=="M"?0:1)*1000+i*10+f,titulo:`${SEXNOME[a.sexo]} - ${il} - Faixa ${DIV_FAIXA[f][0]}`};
+}
