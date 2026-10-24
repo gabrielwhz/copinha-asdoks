@@ -1,4 +1,4 @@
-console.log("ASDOKS build 13");
+console.log("ASDOKS build 14");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
@@ -196,7 +196,7 @@ function sheet(cod){
   const body=d?bracketSVG(d,id=>{const a=at(id);return a.nome+(a.acad?" - "+a.acad:"")}):`<div class="empty">Chave ainda não sorteada.</div>`;
   const faixas=[...new Set(atletasDe(cod).map(a=>a.grad))].sort((a,b)=>GRADS.indexOf(a)-GRADS.indexOf(b)).join(" e ");
   return `<div class="sheet"><div class="sh-head"><img src="assets/logo.png" alt=""><div><h3>I COPINHA ASDOKS</h3><p>Súmula de combate · ${MODNOME[c.mod]}</p></div></div>
-  <div class="ttl">${esc(("Categoria "+SEXNOME[c.sexo]+" "+nomeCat(c)+(faixas?" - "+faixas:"")+" - Modalidade "+MODNOME[c.mod]+" - Cód "+c.cod).toUpperCase())}</div>${body}
+  <div class="ttl">${esc(tituloSumula(cod))}</div>${body}
   <div class="class"><h4>CLASSIFICAÇÃO</h4><div>1º</div><div>2º</div><div>3º</div><div>4º</div></div>
   <div class="sig">ÁRBITROS: ________________; ________________; ________________; ________________; ________________;<br>MESÁRIOS: ________________; ________________; ________________;</div></div>`;
 }
@@ -224,8 +224,8 @@ const aguarda=()=>new Promise(r=>setTimeout(r));
 function baixarBlob(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
 function rotuloAtleta(id){const a=S.atl.find(x=>x.id==id);return a?a.nome+(a.acad?" - "+a.acad:""):""}
 function tituloSumula(cod){
-  const c=catDe(cod),faixas=[...new Set(atletasDe(cod).map(a=>a.grad))].sort((a,b)=>GRADS.indexOf(a)-GRADS.indexOf(b)).join(" e ");
-  return ("Categoria "+SEXNOME[c.sexo]+" "+nomeCat(c)+(faixas?" - "+faixas:"")+" - Modalidade "+MODNOME[c.mod]+" - Cód "+c.cod).toUpperCase();
+  const c=catDe(cod);
+  return `${SEXNOME[c.sexo]} · Cód ${c.cod} · ${nomeCat(c)}`;
 }
 // Súmula em PDF (desenhada com jsPDF). Escolhe retrato ou paisagem, o que deixar a chave maior.
 function sumulaPDF(cod,lg){
