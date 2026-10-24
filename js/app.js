@@ -1,4 +1,4 @@
-console.log("ASDOKS build 12");
+console.log("ASDOKS build 13");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
@@ -295,6 +295,44 @@ async function apagarTodas(){
   S.draws={};render();toast("Todas as chaves foram apagadas");
 }
 
+// Junta todas as súmulas sorteadas em UM único PDF, uma página por súmula (funções novas; as demais não foram alteradas)
+function paginaSumula(doc,cod,g,lg,W,H,s){
+  const c=catDe(cod);
+  let x=10;
+  if(lg){const h=16,w=h*lg.w/lg.h;doc.addImage(lg.d,"PNG",10,8,w,h);x=10+w+4}
+  doc.setFont("helvetica","bold").setFontSize(16).setTextColor(14,47,90).text("I COPINHA ASDOKS",x,15);
+  doc.setFont("helvetica","normal").setFontSize(9).setTextColor(90,90,90).text(`Súmula de combate - ${MODNOME[c.mod]}`,x,21);
+  doc.setDrawColor(31,102,176).setLineWidth(0.8).line(10,27,W-10,27);
+  doc.setFont("helvetica","bold").setFontSize(10).setTextColor(0,0,0).text(doc.splitTextToSize(tituloSumula(cod),W-20),10,33);
+  const ox=10,oy=42;
+  doc.setDrawColor(0,0,0).setLineWidth(Math.max(0.2,1.4*s));
+  g.lines.forEach(l=>doc.line(ox+l[0]*s,oy+l[1]*s,ox+l[2]*s,oy+l[3]*s));
+  doc.setFont("helvetica","normal").setFontSize(Math.max(6,12.5*s*2.835)).setTextColor(0,0,0);
+  g.texts.forEach(t=>doc.text(t.t,ox+t.x*s,oy+t.y*s));
+  const by=H-62,cx=W-10-60;
+  doc.setFont("helvetica","bold").setFontSize(10).text("CLASSIFICAÇÃO",cx+30,by,{align:"center"});
+  doc.setFont("helvetica","normal").setFontSize(9).setLineWidth(0.4);
+  for(let i=0;i<4;i++){const yy=by+8+i*6.5;doc.text(`${i+1}º`,cx+1,yy);doc.line(cx,yy+1.5,cx+60,yy+1.5)}
+  doc.text("ÁRBITROS: ________________; ________________; ________________; ________________; ________________;",10,by+40);
+  doc.text("MESÁRIOS: ________________; ________________; ________________;",10,by+48);
+}
+async function baixarPDFUnico(){
+  if(!window.jspdf){alert("A biblioteca de PDF não carregou. Verifique a internet.");return}
+  const cods=CATEGORIAS.filter(c=>S.draws[c.cod]).map(c=>c.cod);
+  if(!cods.length){alert("Nenhuma chave sorteada para juntar. Gere as chaves primeiro.");return}
+  const lg=await logoDataURL();let doc=null;
+  for(let i=0;i<cods.length;i++){
+    toast(`Montando página ${i+1} de ${cods.length}...`);await aguarda();
+    const g=bracketGeom(S.draws[cods[i]],rotuloAtleta);
+    const area=(w,h)=>Math.min((w-20)/g.w,(h-107)/g.h,0.3);
+    const land=area(297,210)>area(210,297),W=land?297:210,H=land?210:297,ori=land?"landscape":"portrait";
+    if(!doc)doc=new window.jspdf.jsPDF({unit:"mm",format:"a4",orientation:ori});else doc.addPage("a4",ori);
+    paginaSumula(doc,cods[i],g,lg,W,H,area(W,H));
+  }
+  doc.save("Todas as sumulas - I COPINHA ASDOKS.pdf");
+  toast(`PDF único com ${cods.length} súmula(s) gerado`);
+}
+
 /* ---------- CATEGORIAS ---------- */
 function vCategorias(){
   const lista=CATEGORIAS.filter(c=>c.mod==cur.mod);
@@ -310,7 +348,7 @@ function vSumulas(){
   return `<h2>Geração de súmulas</h2>
   <div class="card"><h3>Todas as categorias</h3>
    <p class="hint" style="margin:0 0 4px">${disp} categoria(s) com atletas · ${feitas} com chave sorteada</p>
-   <div class="bar"><button class="btn" onclick="gerarTodas()">Gerar todas as chaves</button><button class="btn alt" onclick="baixarTodas()" ${feitas?"":"disabled"}>Baixar todas (ZIP com pasta)</button><button class="btn alt" onclick="apagarTodas()" ${feitas?"":"disabled"}>Apagar todas as chaves</button></div></div>
+   <div class="bar"><button class="btn" onclick="gerarTodas()">Gerar todas as chaves</button><button class="btn alt" onclick="baixarTodas()" ${feitas?"":"disabled"}>Baixar todas (ZIP com pasta)</button><button class="btn alt" onclick="baixarPDFUnico()" ${feitas?"":"disabled"}>Todas em um único PDF</button><button class="btn alt" onclick="apagarTodas()" ${feitas?"":"disabled"}>Apagar todas as chaves</button></div></div>
   ${seg()}<div class="card"><label>Categoria</label><select onchange="setCod(this.value)">${CATEGORIAS.filter(c=>c.mod==cur.mod).map(c=>`<option value="${c.cod}" ${c.cod==cur.cod?"selected":""}>${SEXNOME[c.sexo]} · Cód ${c.cod} · ${nomeCat(c)} (${atletasDe(c.cod).length} atletas)${S.draws[c.cod]?" ✓":""}</option>`).join("")}</select>
   <p class="hint">As chaves sorteadas ficam salvas no sistema até você apagá-las.</p></div>${painel(cur.cod)}`;
 }
