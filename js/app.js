@@ -1,4 +1,4 @@
-console.log("ASDOKS build 10");
+console.log("ASDOKS build 11");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
@@ -53,6 +53,8 @@ function fillCat(){
   });
   $("#dica").textContent=idade?"Sugerido - "+dica.join(" | "):"Informe a idade para sugerir as categorias automaticamente.";
 }
+// Ordem alfabética: ignora maiúsculas/minúsculas, acentos e espaços nas pontas
+const porNome=(a,b)=>a.nome.trim().localeCompare(b.nome.trim(),"pt-BR",{sensitivity:"base"})||a.nome.localeCompare(b.nome,"pt-BR");
 const norm=s=>String(s||"").trim().toLowerCase();
 const modTxt=a=>a.kata_cod&&a.kumite_cod?"KATA E KUMITÊ":a.kata_cod?"KATA":"KUMITÊ";
 function limpaChaves(...cods){cods.forEach(c=>{if(c)delete S.draws[c]})}
@@ -88,7 +90,7 @@ const nomeTag=a=>esc(a.nome)+(a.pcd?` <span class="tag">PCD</span>`+(a.pcd_descr
 function lista(){
   $("#qtd").textContent=S.atl.length;   // cada atleta conta UMA vez, mesmo em Kata e Kumitê
   $("#lista").innerHTML=S.atl.length?`<table><tr><th>Nome</th><th>Idade</th><th>Sexo</th><th>Faixa</th><th>Academia</th><th>Modalidade</th><th>Cód</th><th></th></tr>`+
-   S.atl.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(a=>`<tr><td>${nomeTag(a)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td><td>${modTxt(a)}</td><td>${[a.kata_cod,a.kumite_cod].filter(Boolean).join(" / ")}</td><td><button class="x" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
+   S.atl.slice().sort(porNome).map(a=>`<tr><td>${nomeTag(a)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td><td>${modTxt(a)}</td><td>${[a.kata_cod,a.kumite_cod].filter(Boolean).join(" / ")}</td><td><button class="x" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
 }
 async function del(id){
   const a=S.atl.find(x=>x.id==id);
@@ -108,7 +110,7 @@ async function gerarTabelaPDF(){
   if(!window.jspdf){alert("A biblioteca de PDF não carregou. Verifique a internet.");return}
   await carregar();
   if(!S.atl.length){alert("Nenhum atleta cadastrado.");return}
-  const lista=S.atl.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR"));
+  const lista=S.atl.slice().sort(porNome);
   const catTxt=a=>{
     const f=(m,cod)=>{if(!cod)return `${MODNOME[m]}: (não inscrito)`;const c=catDe(cod);return `${MODNOME[m]}: Cód ${cod} - ${nomeCat(c).replace(" · "," - ")}`};
     return f("kata",a.kata_cod)+"     |     "+f("kumite",a.kumite_cod);
@@ -168,7 +170,7 @@ function imprimir(cod){
 }
 async function sorteio(cod){
   const ids=atletasDe(cod).map(a=>a.id);
-  if(ids.length<2){alert("São necessários ao menos 2 atletas nesta categoria.");return}
+  if(ids.length<1){alert("Esta categoria não tem atletas.");return}
   const p=sortear(ids),r=await dbSaveDraw(cod,p);
   if(r.error){alert(r.error.message);return}
   S.draws[cod]=p;render();toast(`Chave do Cód ${cod} sorteada`);
@@ -213,8 +215,8 @@ async function baixarPDF(cod){
 }
 // Sorteia de uma vez todas as categorias que têm 2 ou mais atletas
 async function gerarTodas(){
-  const disp=CATEGORIAS.filter(c=>atletasDe(c.cod).length>=2);
-  if(!disp.length){alert("Nenhuma categoria tem 2 ou mais atletas.");return}
+  const disp=CATEGORIAS.filter(c=>atletasDe(c.cod).length>=1);
+  if(!disp.length){alert("Nenhuma categoria tem atletas.");return}
   if(!confirm(`Gerar as chaves de ${disp.length} categoria(s)?`))return;
   const ja=disp.filter(c=>S.draws[c.cod]);
   let alvo=disp;
@@ -253,17 +255,17 @@ async function apagarTodas(){
 function vCategorias(){
   const lista=CATEGORIAS.filter(c=>c.mod==cur.mod);
   const grupo=s=>`<h4>${SEXNOME[s]}</h4>`+lista.filter(c=>c.sexo==s).map(c=>`<button class="cat ${c.cod==cur.cod?"on":""}" onclick="setCod(${c.cod})"><b>Cód ${c.cod}</b><span>${nomeCat(c)}</span><i>${atletasDe(c.cod).length}</i></button>`).join("");
-  const at=atletasDe(cur.cod);
+  const at=atletasDe(cur.cod).slice().sort(porNome);
   return `<h2>Categorias</h2>${seg()}<div class="split"><div class="cats">${grupo("M")}${grupo("F")}</div><div>
   <div class="card"><h3>${esc(tituloCat(catDe(cur.cod)))} — ${at.length} atleta(s)</h3><div class="tbl">${at.length?`<table><tr><th>Nome</th><th>Idade</th><th>Faixa</th><th>Academia</th></tr>${at.map(a=>`<tr><td>${nomeTag(a)}</td><td>${a.idade}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td></tr>`).join("")}</table>`:`<div class="empty">Nenhum atleta nesta categoria.</div>`}</div></div></div></div>`;
 }
 
 /* ---------- SÚMULAS ---------- */
 function vSumulas(){
-  const disp=CATEGORIAS.filter(c=>atletasDe(c.cod).length>=2).length,feitas=Object.keys(S.draws).length;
+  const disp=CATEGORIAS.filter(c=>atletasDe(c.cod).length>=1).length,feitas=Object.keys(S.draws).length;
   return `<h2>Geração de súmulas</h2>
   <div class="card"><h3>Todas as categorias</h3>
-   <p class="hint" style="margin:0 0 4px">${disp} categoria(s) com atletas suficientes · ${feitas} com chave sorteada</p>
+   <p class="hint" style="margin:0 0 4px">${disp} categoria(s) com atletas · ${feitas} com chave sorteada</p>
    <div class="bar"><button class="btn" onclick="gerarTodas()">Gerar todas as chaves</button><button class="btn alt" onclick="baixarTodas()" ${feitas?"":"disabled"}>Baixar todas (ZIP com pasta)</button><button class="btn alt" onclick="apagarTodas()" ${feitas?"":"disabled"}>Apagar todas as chaves</button></div></div>
   ${seg()}<div class="card"><label>Categoria</label><select onchange="setCod(this.value)">${CATEGORIAS.filter(c=>c.mod==cur.mod).map(c=>`<option value="${c.cod}" ${c.cod==cur.cod?"selected":""}>${SEXNOME[c.sexo]} · Cód ${c.cod} · ${nomeCat(c)} (${atletasDe(c.cod).length} atletas)${S.draws[c.cod]?" ✓":""}</option>`).join("")}</select>
   <p class="hint">As chaves sorteadas ficam salvas no sistema até você apagá-las.</p></div>${painel(cur.cod)}`;

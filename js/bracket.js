@@ -1,7 +1,8 @@
 function shuf(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
 // Sorteio: monta os confrontos e distribui os byes quando a chave não fecha
 function sortear(ids){
-  ids=shuf(ids.slice());const n=ids.length;let size=1;while(size<n)size*=2;
+  ids=shuf(ids.slice());const n=ids.length;if(n==1)return[[ids[0],null]];   // categoria com 1 atleta: chave só com ele
+  let size=1;while(size<n)size*=2;
   const m=n-size/2,p=[];let i=0;
   for(let k=0;k<m;k++)p.push([ids[i++],ids[i++]]);
   while(i<n)p.push([ids[i++],null]);
