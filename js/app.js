@@ -1,11 +1,12 @@
-console.log("ASDOKS build 11");
+console.log("ASDOKS build 12");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
+let editId=null;   // id do atleta que está sendo editado (null = cadastro novo)
 const catDe=cod=>CATEGORIAS.find(c=>c.cod==cod);
 const tituloCat=c=>`${MODNOME[c.mod]} ${SEXNOME[c.sexo]} - ${nomeCat(c)} (Cód ${c.cod})`;
 
-function go(v){cur.view=v;render()}
+function go(v){cur.view=v;editId=null;render()}
 function setMod(m){cur.mod=m;cur.cod=CATEGORIAS.find(c=>c.mod==m).cod;render()}
 function setCod(c){cur.cod=+c;render()}
 function toast(msg,link){const t=$("#toast");t.innerHTML=`<span>${msg}</span>`+(link?`<button onclick="go('categorias')">Ver</button>`:"");t.style.display="flex";clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display="none",4000)}
@@ -20,7 +21,7 @@ const seg=()=>`<div class="seg">${["kata","kumite"].map(m=>`<button class="${cur
 
 /* ---------- CADASTRO ---------- */
 function vCadastro(){return `<h2>Cadastro de atletas</h2>
-<div class="card"><div class="grid">
+<div class="card"><div id="editBar" class="editbar" style="display:none"></div><div class="grid">
  <div><label>Nome completo</label><input id="nome"></div>
  <div><label>Idade</label><input id="idade" type="number" min="3" max="80" oninput="fillCat()"></div>
  <div><label>Sexo</label><select id="sexo" onchange="fillCat()"><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
@@ -35,7 +36,7 @@ function vCadastro(){return `<h2>Cadastro de atletas</h2>
  <div id="boxPcd" style="display:none"><label>Qual a deficiência / condição?</label><input id="pcdDesc" placeholder="Descreva"></div>
 </div>
 <p class="hint" id="dica"></p>
-<div class="bar"><button class="btn" onclick="add()">Cadastrar atleta</button>${isAdmin()?`<button class="btn alt" onclick="gerarTabelaPDF()">Gerar tabela de atletas (PDF)</button>`:""}</div></div>
+<div class="bar"><button class="btn" id="btnSalvar" onclick="enviar()">Cadastrar atleta</button><button class="btn alt" id="btnCancel" style="display:none" onclick="cancelarEdicao()">Cancelar edição</button>${isAdmin()?`<button class="btn alt" onclick="gerarTabelaPDF()">Gerar tabela de atletas (PDF)</button>`:""}</div></div>
 <div class="card"><h3>${isAdmin()?"Atletas cadastrados":"Atletas que você cadastrou"} (<span id="qtd">0</span>)</h3><div class="tbl" id="lista"></div></div>`}
 
 function fillCat(){
@@ -86,18 +87,61 @@ async function add(){
   S.atl.push(r.data);limpaChaves(kata,kumite);
   $("#nome").value="";$("#pcdDesc").value="";$("#nome").focus();lista();toast("Atleta cadastrado");
 }
+// ---------- EDITAR CADASTRO ----------
+const enviar=()=>editId?salvar():add();
+const setSel=(sel,v)=>{if(sel.querySelector(`option[value="${v}"]`))sel.value=v};
+function editar(id){
+  const a=S.atl.find(x=>x.id==id);if(!a)return;
+  editId=id;
+  $("#nome").value=a.nome;$("#idade").value=a.idade;$("#sexo").value=a.sexo;$("#grad").value=a.grad;$("#acad").value=a.acad||"";
+  $("#pcd").checked=!!a.pcd;$("#pcdDesc").value=a.pcd_descricao||"";
+  $("#mod").value=a.kata_cod&&a.kumite_cod?"ambas":a.kata_cod?"kata":"kumite";
+  fillCat();
+  if(a.kata_cod)setSel($("#catKata"),a.kata_cod);
+  if(a.kumite_cod)setSel($("#catKumite"),a.kumite_cod);
+  $("#editBar").style.display="";$("#editBar").textContent=`✎ Editando o cadastro de ${a.nome}`;
+  $("#btnSalvar").textContent="Salvar alterações";$("#btnCancel").style.display="";
+  lista();$("#editBar").scrollIntoView({behavior:"smooth",block:"center"});
+}
+function cancelarEdicao(){
+  editId=null;
+  ["#nome","#idade","#acad","#pcdDesc"].forEach(s=>$(s).value="");
+  $("#sexo").value="M";$("#grad").selectedIndex=0;$("#pcd").checked=false;$("#mod").value="kata";
+  $("#editBar").style.display="none";$("#btnSalvar").textContent="Cadastrar atleta";$("#btnCancel").style.display="none";
+  fillCat();lista();
+}
+async function salvar(){
+  const a=S.atl.find(x=>x.id==editId);if(!a){cancelarEdicao();return}
+  const nome=$("#nome").value.trim(),idade=+$("#idade").value;
+  if(!nome||!idade){alert("Preencha nome e idade.");return}
+  const pcd=$("#pcd").checked,pcdDesc=$("#pcdDesc").value.trim();
+  if(pcd&&!pcdDesc){alert("Descreva a deficiência / condição do atleta PCD.");return}
+  const mod=$("#mod").value,sexo=$("#sexo").value,grad=$("#grad").value,acad=$("#acad").value.trim();
+  const kata=mod!="kumite"?+$("#catKata").value:null,kumite=mod!="kata"?+$("#catKumite").value:null;
+  if((mod!="kumite"&&!kata)||(mod!="kata"&&!kumite)){alert("Não há categoria disponível para essas opções.");return}
+  const dup=S.atl.find(x=>x.id!=a.id&&norm(x.nome)==norm(nome)&&x.sexo==sexo&&x.idade==idade&&x.grad==grad);
+  if(dup){alert(`Já existe outro cadastro de ${dup.nome} com esses mesmos dados.`);return}
+  const antes={k:a.kata_cod||null,u:a.kumite_cod||null};
+  const r=await dbUpdate(a.id,{nome,idade,sexo,grad,acad,kata_cod:kata,kumite_cod:kumite,pcd,pcd_descricao:pcd?pcdDesc:null});
+  if(r.error){alert(r.error.message);return}
+  Object.assign(a,r.data);
+  // mudou de categoria: a chave sorteada daquela categoria deixa de valer (o banco também apaga)
+  if(antes.k!==(a.kata_cod||null))limpaChaves(antes.k,a.kata_cod);
+  if(antes.u!==(a.kumite_cod||null))limpaChaves(antes.u,a.kumite_cod);
+  cancelarEdicao();toast("Cadastro atualizado");
+}
 const nomeTag=a=>esc(a.nome)+(a.pcd?` <span class="tag">PCD</span>`+(a.pcd_descricao?`<small class="obs">${esc(a.pcd_descricao)}</small>`:""):"");
 function lista(){
   $("#qtd").textContent=S.atl.length;   // cada atleta conta UMA vez, mesmo em Kata e Kumitê
   $("#lista").innerHTML=S.atl.length?`<table><tr><th>Nome</th><th>Idade</th><th>Sexo</th><th>Faixa</th><th>Academia</th><th>Modalidade</th><th>Cód</th><th></th></tr>`+
-   S.atl.slice().sort(porNome).map(a=>`<tr><td>${nomeTag(a)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td><td>${modTxt(a)}</td><td>${[a.kata_cod,a.kumite_cod].filter(Boolean).join(" / ")}</td><td><button class="x" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
+   S.atl.slice().sort(porNome).map(a=>`<tr${a.id==editId?' class="edit"':""}><td>${nomeTag(a)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td><td>${modTxt(a)}</td><td>${[a.kata_cod,a.kumite_cod].filter(Boolean).join(" / ")}</td><td><button class="x ed" title="Editar" onclick="editar('${a.id}')">✎</button><button class="x" title="Remover" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
 }
 async function del(id){
   const a=S.atl.find(x=>x.id==id);
   if(!a||!confirm(`Remover ${a.nome}?`))return;
   const r=await dbDel(id);
   if(r.error){alert(r.error.message);return}
-  limpaChaves(a.kata_cod,a.kumite_cod);S.atl=S.atl.filter(x=>x.id!=id);lista();
+  limpaChaves(a.kata_cod,a.kumite_cod);S.atl=S.atl.filter(x=>x.id!=id);if(editId==id)cancelarEdicao();else lista();
 }
 
 function logoDataURL(){return new Promise(res=>{const i=new Image();
