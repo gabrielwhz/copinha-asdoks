@@ -1,4 +1,4 @@
-console.log("ASDOKS build 6");
+console.log("ASDOKS build 9");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
@@ -26,6 +26,8 @@ function vCadastro(){return `<h2>Cadastro de atletas</h2>
  <div><label>Sexo</label><select id="sexo" onchange="fillCat()"><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
  <div><label>Graduação (faixa)</label><select id="grad" onchange="fillCat()">${GRADS.map(g=>`<option>${g}</option>`).join("")}</select></div>
  <div><label>Academia / equipe</label><input id="acad"></div>
+ <div><label>Atleta PCD</label><label class="sw"><input type="checkbox" id="pcd" onchange="fillCat()"><span></span><b id="pcdTxt">OFF</b></label></div>
+ <div id="boxPcd" style="display:none"><label>Qual a deficiência / condição?</label><input id="pcdDesc" placeholder="Descreva"></div>
  <div><label>Modalidade</label><select id="mod" onchange="fillCat()"><option value="kata">Kata</option><option value="kumite">Kumitê</option><option value="ambas">Kata e Kumitê</option></select></div>
  <div id="boxKata"><label>Categoria de Kata</label><select id="catKata"></select></div>
  <div id="boxKumite"><label>Categoria de Kumitê</label><select id="catKumite"></select></div>
@@ -35,12 +37,15 @@ function vCadastro(){return `<h2>Cadastro de atletas</h2>
 <div class="card"><h3>${isAdmin()?"Atletas cadastrados":"Atletas que você cadastrou"} (<span id="qtd">0</span>)</h3><div class="tbl" id="lista"></div></div>`}
 
 function fillCat(){
-  const mod=$("#mod").value,sexo=$("#sexo").value,idade=+$("#idade").value,grad=$("#grad").value,dica=[];
+  const mod=$("#mod").value,sexo=$("#sexo").value,idade=+$("#idade").value,grad=$("#grad").value,pcd=$("#pcd").checked,dica=[];
+  $("#boxPcd").style.display=pcd?"":"none";$("#pcdTxt").textContent=pcd?"ON":"OFF";
   ["kata","kumite"].forEach(m=>{
     const sel=$(m=="kata"?"#catKata":"#catKumite"),box=$(m=="kata"?"#boxKata":"#boxKumite"),on=mod==m||mod=="ambas";
     box.style.display=on?"":"none";
-    const x=idade?acharCat(m,sexo,idade,grad):null,old=sel.value;
-    sel.innerHTML=CATEGORIAS.filter(c=>c.mod==m&&c.sexo==sexo).map(c=>`<option value="${c.cod}">Cód ${c.cod} - ${nomeCat(c)}</option>`).join("");
+    // PCD ligado: só categorias PCD. PCD desligado: só as categorias comuns.
+    const lista=CATEGORIAS.filter(c=>c.mod==m&&c.sexo==sexo&&!!c.pcd==pcd);
+    const x=idade?acharCat(m,sexo,idade,grad,pcd):null,old=sel.value;
+    sel.innerHTML=lista.length?lista.map(c=>`<option value="${c.cod}">Cód ${c.cod} - ${nomeCat(c)}</option>`).join(""):`<option value="">Não há categoria${pcd?" PCD":""} de ${MODNOME[m]} para este sexo</option>`;
     sel.value=x?x.cod:(old&&sel.querySelector(`option[value="${old}"]`)?old:sel.options[0].value);
     if(on&&idade)dica.push(x?`${MODNOME[m]}: Cód ${x.cod}`:`${MODNOME[m]}: nenhuma categoria compatível, escolha manualmente`);
   });
@@ -53,11 +58,15 @@ function limpaChaves(...cods){cods.forEach(c=>{if(c)delete S.draws[c]})}
 async function add(){
   const nome=$("#nome").value.trim(),idade=+$("#idade").value;
   if(!nome||!idade){alert("Preencha nome e idade.");return}
+  const pcd=$("#pcd").checked,pcdDesc=$("#pcdDesc").value.trim();
+  if(pcd&&!pcdDesc){alert("Descreva a deficiência / condição do atleta PCD.");return}
   const mod=$("#mod").value,sexo=$("#sexo").value,grad=$("#grad").value,acad=$("#acad").value.trim();
   const kata=mod!="kumite"?+$("#catKata").value:null,kumite=mod!="kata"?+$("#catKumite").value:null;
+  if((mod!="kumite"&&!kata)||(mod!="kata"&&!kumite)){alert("Não há categoria disponível para essas opções.");return}
   // atleta já cadastrado? (mesmo nome, sexo, idade e faixa) -> adiciona a modalidade que falta, sem duplicar
   const ex=S.atl.find(a=>norm(a.nome)==norm(nome)&&a.sexo==sexo&&a.idade==idade&&a.grad==grad);
   if(ex){
+    if(!!ex.pcd!==pcd){alert(`${ex.nome} já está cadastrado ${ex.pcd?"como PCD":"sem PCD"}. Ajuste a opção PCD para combinar com o cadastro.`);return}
     const falta={};
     if(kata&&!ex.kata_cod)falta.kata_cod=kata;
     if(kumite&&!ex.kumite_cod)falta.kumite_cod=kumite;
@@ -68,15 +77,16 @@ async function add(){
     Object.assign(ex,r.data);limpaChaves(falta.kata_cod,falta.kumite_cod);
     $("#nome").value="";lista();toast("Modalidade adicionada ao atleta");return;
   }
-  const r=await dbAdd({nome,idade,sexo,grad,acad,kata_cod:kata,kumite_cod:kumite});
+  const r=await dbAdd({nome,idade,sexo,grad,acad,kata_cod:kata,kumite_cod:kumite,pcd,pcd_descricao:pcd?pcdDesc:null});
   if(r.error){alert(r.error.message);return}
   S.atl.push(r.data);limpaChaves(kata,kumite);
-  $("#nome").value="";$("#nome").focus();lista();toast("Atleta cadastrado");
+  $("#nome").value="";$("#pcdDesc").value="";$("#nome").focus();lista();toast("Atleta cadastrado");
 }
+const nomeTag=a=>esc(a.nome)+(a.pcd?` <span class="tag">PCD</span>`+(a.pcd_descricao?`<small class="obs">${esc(a.pcd_descricao)}</small>`:""):"");
 function lista(){
   $("#qtd").textContent=S.atl.length;   // cada atleta conta UMA vez, mesmo em Kata e Kumitê
   $("#lista").innerHTML=S.atl.length?`<table><tr><th>Nome</th><th>Idade</th><th>Sexo</th><th>Faixa</th><th>Academia</th><th>Modalidade</th><th>Cód</th><th></th></tr>`+
-   S.atl.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(a=>`<tr><td>${esc(a.nome)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td><td>${modTxt(a)}</td><td>${[a.kata_cod,a.kumite_cod].filter(Boolean).join(" / ")}</td><td><button class="x" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
+   S.atl.slice().sort((a,b)=>a.nome.localeCompare(b.nome)).map(a=>`<tr><td>${nomeTag(a)}</td><td>${a.idade}</td><td>${a.sexo}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td><td>${modTxt(a)}</td><td>${[a.kata_cod,a.kumite_cod].filter(Boolean).join(" / ")}</td><td><button class="x" onclick="del('${a.id}')">✕</button></td></tr>`).join("")+"</table>":`<div class="empty">Nenhum atleta cadastrado.</div>`;
 }
 async function del(id){
   const a=S.atl.find(x=>x.id==id);
@@ -243,7 +253,7 @@ function vCategorias(){
   const grupo=s=>`<h4>${SEXNOME[s]}</h4>`+lista.filter(c=>c.sexo==s).map(c=>`<button class="cat ${c.cod==cur.cod?"on":""}" onclick="setCod(${c.cod})"><b>Cód ${c.cod}</b><span>${nomeCat(c)}</span><i>${atletasDe(c.cod).length}</i></button>`).join("");
   const at=atletasDe(cur.cod);
   return `<h2>Categorias</h2>${seg()}<div class="split"><div class="cats">${grupo("M")}${grupo("F")}</div><div>
-  <div class="card"><h3>${esc(tituloCat(catDe(cur.cod)))} — ${at.length} atleta(s)</h3><div class="tbl">${at.length?`<table><tr><th>Nome</th><th>Idade</th><th>Faixa</th><th>Academia</th></tr>${at.map(a=>`<tr><td>${esc(a.nome)}</td><td>${a.idade}</td><td>${a.grad}</td><td>${esc(a.acad)}</td></tr>`).join("")}</table>`:`<div class="empty">Nenhum atleta nesta categoria.</div>`}</div></div></div></div>`;
+  <div class="card"><h3>${esc(tituloCat(catDe(cur.cod)))} — ${at.length} atleta(s)</h3><div class="tbl">${at.length?`<table><tr><th>Nome</th><th>Idade</th><th>Faixa</th><th>Academia</th></tr>${at.map(a=>`<tr><td>${nomeTag(a)}</td><td>${a.idade}</td><td>${a.grad}</td><td>${esc(a.acad||"")}</td></tr>`).join("")}</table>`:`<div class="empty">Nenhum atleta nesta categoria.</div>`}</div></div></div></div>`;
 }
 
 /* ---------- SÚMULAS ---------- */

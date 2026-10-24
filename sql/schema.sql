@@ -18,15 +18,17 @@ create table public.atletas (
   sexo char(1) not null check (sexo in ('M','F')),
   grad text not null,
   acad text,
-  kata_cod int check (kata_cod between 1 and 14),     -- categoria de Kata (vazio = não participa)
-  kumite_cod int check (kumite_cod between 15 and 32), -- categoria de Kumitê (vazio = não participa)
+  pcd boolean not null default false,
+  pcd_descricao text,
+  kata_cod int check (kata_cod between 1 and 14 or kata_cod in (33, 34)),     -- categoria de Kata (vazio = não participa)
+  kumite_cod int check (kumite_cod between 15 and 32 or kumite_cod in (35, 36)), -- categoria de Kumitê (vazio = não participa)
   check (kata_cod is not null or kumite_cod is not null),
   created_by uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz default now()
 );
 
 create table public.chaves (
-  cod int primary key check (cod between 1 and 32),
+  cod int primary key check (cod between 1 and 36),
   pares jsonb not null,                              -- confrontos sorteados
   updated_at timestamptz default now()
 );

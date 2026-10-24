@@ -10,15 +10,22 @@ const CATEGORIAS=[];
     lista.forEach(r=>CATEGORIAS.push({cod:cod++,mod,sexo,amin:r[0],amax:r[1],gmin:r[2],gmax:r[3]}));
   });
 })();
+// Categorias PCD: ficam por último na ordem de código (depois das de Kumitê). Só aparecem quando o atleta é marcado como PCD.
+CATEGORIAS.push(
+  {cod:33,mod:"kata",sexo:"M",amin:0,amax:7,gmin:0,gmax:7,pcd:true},     // Kata: até 7 anos, Absoluto
+  {cod:34,mod:"kata",sexo:"M",amin:8,amax:10,gmin:1,gmax:2,pcd:true},    // Kata: 8 a 10 anos, Amarela e Vermelha
+  {cod:35,mod:"kumite",sexo:"M",amin:7,amax:8,gmin:0,gmax:1,pcd:true},   // Kumitê: 7 e 8 anos, Branca e Amarela
+  {cod:36,mod:"kumite",sexo:"M",amin:9,amax:10,gmin:2,gmax:7,pcd:true}   // Kumitê: 9 e 10 anos, Vermelha acima
+);
 function nomeCat(c){
   const idade=c.amin==0?`Até ${c.amax} anos`:(c.amax-c.amin==1?`${c.amin} e ${c.amax} anos`:`${c.amin} a ${c.amax} anos`);
   const g=(c.gmin==0&&c.gmax==7)?"Absoluto":c.gmax==7?`${GRADS[c.gmin]} acima`:c.gmin==c.gmax?GRADS[c.gmin]:`${GRADS[c.gmin]} e ${GRADS[c.gmax]}`;
-  return `${idade} · ${g}`;
+  return `${c.pcd?"PCD - ":""}${idade} · ${g}`;
 }
 const MODNOME={kata:"Kata",kumite:"Kumitê"},SEXNOME={M:"Masculino",F:"Feminino"};
-function acharCat(mod,sexo,idade,grad){
+function acharCat(mod,sexo,idade,grad,pcd){
   const g=GRADS.indexOf(grad);
-  return CATEGORIAS.find(c=>c.mod==mod&&c.sexo==sexo&&idade>=c.amin&&idade<=c.amax&&g>=c.gmin&&g<=c.gmax);
+  return CATEGORIAS.find(c=>!!c.pcd==!!pcd&&c.mod==mod&&c.sexo==sexo&&idade>=c.amin&&idade<=c.amax&&g>=c.gmin&&g<=c.gmax);
 }
 
 // Divisões da tabela geral: idade e faixa, valem para Kata e Kumitê.
