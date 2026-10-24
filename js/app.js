@@ -1,4 +1,4 @@
-console.log("ASDOKS build 9");
+console.log("ASDOKS build 10");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
@@ -26,11 +26,13 @@ function vCadastro(){return `<h2>Cadastro de atletas</h2>
  <div><label>Sexo</label><select id="sexo" onchange="fillCat()"><option value="M">Masculino</option><option value="F">Feminino</option></select></div>
  <div><label>Graduação (faixa)</label><select id="grad" onchange="fillCat()">${GRADS.map(g=>`<option>${g}</option>`).join("")}</select></div>
  <div><label>Academia / equipe</label><input id="acad"></div>
- <div><label>Atleta PCD</label><label class="sw"><input type="checkbox" id="pcd" onchange="fillCat()"><span></span><b id="pcdTxt">OFF</b></label></div>
- <div id="boxPcd" style="display:none"><label>Qual a deficiência / condição?</label><input id="pcdDesc" placeholder="Descreva"></div>
  <div><label>Modalidade</label><select id="mod" onchange="fillCat()"><option value="kata">Kata</option><option value="kumite">Kumitê</option><option value="ambas">Kata e Kumitê</option></select></div>
  <div id="boxKata"><label>Categoria de Kata</label><select id="catKata"></select></div>
  <div id="boxKumite"><label>Categoria de Kumitê</label><select id="catKumite"></select></div>
+</div>
+<div class="pcdrow">
+ <div><label>Atleta PCD</label><label class="sw"><input type="checkbox" id="pcd" onchange="fillCat()"><span></span><b id="pcdTxt">OFF</b></label></div>
+ <div id="boxPcd" style="display:none"><label>Qual a deficiência / condição?</label><input id="pcdDesc" placeholder="Descreva"></div>
 </div>
 <p class="hint" id="dica"></p>
 <div class="bar"><button class="btn" onclick="add()">Cadastrar atleta</button>${isAdmin()?`<button class="btn alt" onclick="gerarTabelaPDF()">Gerar tabela de atletas (PDF)</button>`:""}</div></div>
