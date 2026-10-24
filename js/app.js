@@ -1,4 +1,4 @@
-console.log("ASDOKS build 5");
+console.log("ASDOKS build 6");
 const $=s=>document.querySelector(s);
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const cur={view:"cadastro",mod:"kata",cod:1};
@@ -90,38 +90,45 @@ function logoDataURL(){return new Promise(res=>{const i=new Image();
   i.onload=()=>{try{const c=document.createElement("canvas");c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext("2d").drawImage(i,0,0);res({d:c.toDataURL("image/png"),w:i.naturalWidth,h:i.naturalHeight})}catch(e){res(null)}};
   i.onerror=()=>res(null);i.src="assets/logo.png"})}
 
-// Tabela com todos os atletas, separada por divisão de idade e faixa (vale para Kata e Kumitê) - somente admin
+// Tabela geral (somente admin): todos os atletas em ordem alfabética, com a linha das categorias embaixo de cada um
 async function gerarTabelaPDF(){
   if(!isAdmin())return;
   if(!window.jspdf){alert("A biblioteca de PDF não carregou. Verifique a internet.");return}
   await carregar();
   if(!S.atl.length){alert("Nenhum atleta cadastrado.");return}
-  const grupos={};
-  S.atl.forEach(a=>{const d=divisao(a);(grupos[d.ord]=grupos[d.ord]||{d,lista:[]}).lista.push(a)});
-  const secoes=Object.values(grupos).sort((x,y)=>x.d.ord-y.d.ord);
-  const obs=a=>a.kata_cod&&a.kumite_cod?"":a.kata_cod?"  (somente Kata)":"  (somente Kumitê)";
+  const lista=S.atl.slice().sort((a,b)=>a.nome.localeCompare(b.nome,"pt-BR"));
+  const catTxt=a=>{
+    const f=(m,cod)=>{if(!cod)return `${MODNOME[m]}: (não inscrito)`;const c=catDe(cod);return `${MODNOME[m]}: Cód ${cod} - ${nomeCat(c).replace(" · "," - ")}`};
+    return f("kata",a.kata_cod)+"     |     "+f("kumite",a.kumite_cod);
+  };
   const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4"}),lg=await logoDataURL();
   let x=14;
   if(lg){const h=20,w=h*lg.w/lg.h;doc.addImage(lg.d,"PNG",14,8,w,h);x=14+w+4}
   doc.setFont("helvetica","bold").setFontSize(16).setTextColor(14,47,90).text("I COPINHA ASDOKS",x,17);
-  doc.setFont("helvetica","normal").setFontSize(10).setTextColor(90,90,90).text(`Lista de atletas por idade e faixa - ${S.atl.length} atletas - ${new Date().toLocaleDateString("pt-BR")}`,x,24);
-  let y=34;
-  secoes.forEach(s=>{
-    if(y>255){doc.addPage();y=16}
-    const at=s.lista.slice().sort((a,b)=>a.nome.localeCompare(b.nome));
-    doc.setFillColor(31,102,176).rect(14,y,182,8,"F");
-    doc.setFont("helvetica","bold").setFontSize(10).setTextColor(255,255,255)
-      .text(s.d.titulo.toUpperCase(),16,y+5.5)
-      .text(`${at.length} atleta(s)`,194,y+5.5,{align:"right"});
-    doc.autoTable({startY:y+8,margin:{left:14,right:14},theme:"grid",rowPageBreak:"avoid",
-      styles:{fontSize:9,cellPadding:1.8,textColor:[26,36,51]},headStyles:{fillColor:[230,238,248],textColor:[14,47,90]},
-      head:[["Nº","Nome","Idade","Faixa","Academia / equipe"]],
-      body:at.map((a,i)=>[i+1,a.nome+obs(a),a.idade,a.grad,a.acad||""]),
-      columnStyles:{0:{cellWidth:10},2:{cellWidth:16},3:{cellWidth:26}}});
-    y=doc.lastAutoTable.finalY+8;
+  doc.setFont("helvetica","normal").setFontSize(10).setTextColor(90,90,90).text(`Lista de atletas - ${lista.length} atletas - ${new Date().toLocaleDateString("pt-BR")}`,x,24);
+  const X={n:16,nome:24,idade:108,faixa:124,acad:150},RH=12.5;
+  const cab=y=>{
+    doc.setFillColor(230,238,248).rect(14,y,182,7,"F");
+    doc.setFont("helvetica","bold").setFontSize(9).setTextColor(14,47,90);
+    doc.text("Nº",X.n,y+4.8);doc.text("Nome",X.nome,y+4.8);doc.text("Idade",X.idade,y+4.8);doc.text("Faixa",X.faixa,y+4.8);doc.text("Academia / equipe",X.acad,y+4.8);
+    return y+7;
+  };
+  let y=cab(34);
+  lista.forEach((a,i)=>{
+    if(y+RH>284){doc.addPage();y=cab(14)}
+    if(i%2==0){doc.setFillColor(246,248,251).rect(14,y,182,RH,"F")}
+    doc.setFont("helvetica","normal").setFontSize(9).setTextColor(26,36,51);
+    doc.text(String(i+1),X.n,y+4.8);
+    doc.text(doc.splitTextToSize(a.nome,80)[0]||"",X.nome,y+4.8);
+    doc.text(String(a.idade),X.idade,y+4.8);
+    doc.text(a.grad,X.faixa,y+4.8);
+    doc.text(doc.splitTextToSize(a.acad||"",44)[0]||"",X.acad,y+4.8);
+    doc.setFontSize(7.5).setTextColor(80,92,110).text(catTxt(a),X.nome,y+10);
+    doc.setDrawColor(210,216,224).setLineWidth(0.2).line(14,y+RH,196,y+RH);
+    y+=RH;
   });
   const n=doc.getNumberOfPages();
-  for(let i=1;i<=n;i++){doc.setPage(i);doc.setFont("helvetica","normal").setFontSize(8).setTextColor(120,120,120).text(`Página ${i} de ${n}`,105,290,{align:"center"})}
+  for(let i=1;i<=n;i++){doc.setPage(i);doc.setFont("helvetica","normal").setFontSize(8).setTextColor(120,120,120).text(`Página ${i} de ${n}`,105,291,{align:"center"})}
   doc.save("atletas-copinha-asdoks.pdf");
 }
 
@@ -136,7 +143,7 @@ function sheet(cod){
   <div class="sig">ÁRBITROS: ________________; ________________; ________________; ________________; ________________;<br>MESÁRIOS: ________________; ________________; ________________;</div></div>`;
 }
 function painel(cod){const d=S.draws[cod];
-  return `<div class="bar"><button class="btn" onclick="sorteio(${cod})">${d?"Sortear novamente":"Sortear chave"}</button><button class="btn alt" onclick="imprimir(${cod})" ${d?"":"disabled"}>Imprimir / PDF</button><button class="btn alt" onclick="baixar(${cod})" ${d?"":"disabled"}>Baixar chave (SVG)</button></div>`+sheet(cod)}
+  return `<div class="bar"><button class="btn" onclick="sorteio(${cod})">${d?"Sortear novamente":"Sortear chave"}</button><button class="btn alt" onclick="imprimir(${cod})" ${d?"":"disabled"}>Imprimir</button><button class="btn alt" onclick="baixarPDF(${cod})" ${d?"":"disabled"}>Baixar PDF</button><button class="btn alt" onclick="apagarChave(${cod})" ${d?"":"disabled"}>Apagar chave</button></div>`+sheet(cod)}
 // Nome do arquivo = nome da categoria. No PDF, o navegador usa o título da página como nome sugerido.
 function nomeArquivo(cod){
   const c=catDe(cod);
@@ -154,10 +161,80 @@ async function sorteio(cod){
   if(r.error){alert(r.error.message);return}
   S.draws[cod]=p;render();toast(`Chave do Cód ${cod} sorteada`);
 }
-function baixar(cod){
-  const s=$("#svg");if(!s)return;
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([s.outerHTML],{type:"image/svg+xml"}));
-  a.download=nomeArquivo(cod)+".svg";a.click();
+const PASTA="Sumulas - I COPINHA ASDOKS";
+const aguarda=()=>new Promise(r=>setTimeout(r));
+function baixarBlob(blob,nome){const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=nome;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
+function rotuloAtleta(id){const a=S.atl.find(x=>x.id==id);return a?a.nome+(a.acad?" - "+a.acad:""):""}
+function tituloSumula(cod){
+  const c=catDe(cod),faixas=[...new Set(atletasDe(cod).map(a=>a.grad))].sort((a,b)=>GRADS.indexOf(a)-GRADS.indexOf(b)).join(" e ");
+  return ("Categoria "+SEXNOME[c.sexo]+" "+nomeCat(c)+(faixas?" - "+faixas:"")+" - Modalidade "+MODNOME[c.mod]+" - Cód "+c.cod).toUpperCase();
+}
+// Súmula em PDF (desenhada com jsPDF). Escolhe retrato ou paisagem, o que deixar a chave maior.
+function sumulaPDF(cod,lg){
+  const c=catDe(cod),g=bracketGeom(S.draws[cod],rotuloAtleta);
+  const area=(w,h)=>Math.min((w-20)/g.w,(h-107)/g.h,0.3);
+  const land=area(297,210)>area(210,297),W=land?297:210,H=land?210:297,s=area(W,H);
+  const doc=new window.jspdf.jsPDF({unit:"mm",format:"a4",orientation:land?"landscape":"portrait"});
+  let x=10;
+  if(lg){const h=16,w=h*lg.w/lg.h;doc.addImage(lg.d,"PNG",10,8,w,h);x=10+w+4}
+  doc.setFont("helvetica","bold").setFontSize(16).setTextColor(14,47,90).text("I COPINHA ASDOKS",x,15);
+  doc.setFont("helvetica","normal").setFontSize(9).setTextColor(90,90,90).text(`Súmula de combate - ${MODNOME[c.mod]}`,x,21);
+  doc.setDrawColor(31,102,176).setLineWidth(0.8).line(10,27,W-10,27);
+  doc.setFont("helvetica","bold").setFontSize(10).setTextColor(0,0,0).text(doc.splitTextToSize(tituloSumula(cod),W-20),10,33);
+  const ox=10,oy=42;
+  doc.setDrawColor(0,0,0).setLineWidth(Math.max(0.2,1.4*s));
+  g.lines.forEach(l=>doc.line(ox+l[0]*s,oy+l[1]*s,ox+l[2]*s,oy+l[3]*s));
+  doc.setFont("helvetica","normal").setFontSize(Math.max(6,12.5*s*2.835)).setTextColor(0,0,0);
+  g.texts.forEach(t=>doc.text(t.t,ox+t.x*s,oy+t.y*s));
+  const by=H-62,cx=W-10-60;
+  doc.setFont("helvetica","bold").setFontSize(10).text("CLASSIFICAÇÃO",cx+30,by,{align:"center"});
+  doc.setFont("helvetica","normal").setFontSize(9).setLineWidth(0.4);
+  for(let i=0;i<4;i++){const yy=by+8+i*6.5;doc.text(`${i+1}º`,cx+1,yy);doc.line(cx,yy+1.5,cx+60,yy+1.5)}
+  doc.setFontSize(9);
+  doc.text("ÁRBITROS: ________________; ________________; ________________; ________________; ________________;",10,by+40);
+  doc.text("MESÁRIOS: ________________; ________________; ________________;",10,by+48);
+  return doc;
+}
+async function baixarPDF(cod){
+  if(!window.jspdf){alert("A biblioteca de PDF não carregou. Verifique a internet.");return}
+  sumulaPDF(cod,await logoDataURL()).save(nomeArquivo(cod)+".pdf");
+}
+// Sorteia de uma vez todas as categorias que têm 2 ou mais atletas
+async function gerarTodas(){
+  const disp=CATEGORIAS.filter(c=>atletasDe(c.cod).length>=2);
+  if(!disp.length){alert("Nenhuma categoria tem 2 ou mais atletas.");return}
+  if(!confirm(`Gerar as chaves de ${disp.length} categoria(s)?`))return;
+  const ja=disp.filter(c=>S.draws[c.cod]);
+  let alvo=disp;
+  if(ja.length&&!confirm(`${ja.length} dessas categorias já estão sorteadas.\n\nOK = sortear essas de novo também\nCancelar = manter as chaves atuais e sortear só as que faltam`))alvo=disp.filter(c=>!S.draws[c.cod]);
+  if(!alvo.length){toast("Todas já estavam sorteadas");return}
+  const agora=new Date().toISOString(),novas=alvo.map(c=>({cod:c.cod,pares:sortear(atletasDe(c.cod).map(a=>a.id)),updated_at:agora}));
+  const r=await dbSaveDraws(novas);
+  if(r.error){alert(r.error.message);return}
+  novas.forEach(n=>S.draws[n.cod]=n.pares);render();toast(`${novas.length} chave(s) gerada(s)`);
+}
+// Baixa todas as súmulas sorteadas: um ZIP com uma pasta dentro, um PDF por categoria (nome + código)
+async function baixarTodas(){
+  if(!window.jspdf||!window.JSZip){alert("As bibliotecas de PDF/ZIP não carregaram. Verifique a internet.");return}
+  const cods=CATEGORIAS.filter(c=>S.draws[c.cod]).map(c=>c.cod);
+  if(!cods.length){alert("Nenhuma chave sorteada para baixar. Gere as chaves primeiro.");return}
+  const lg=await logoDataURL(),zip=new JSZip(),pasta=zip.folder(PASTA);
+  for(let i=0;i<cods.length;i++){
+    toast(`Gerando súmula ${i+1} de ${cods.length}...`);await aguarda();
+    pasta.file(nomeArquivo(cods[i])+".pdf",sumulaPDF(cods[i],lg).output("arraybuffer"));
+  }
+  baixarBlob(await zip.generateAsync({type:"blob"}),PASTA+".zip");
+  toast(`${cods.length} súmula(s) baixada(s)`);
+}
+async function apagarChave(cod){
+  if(!confirm(`Apagar a chave sorteada do Cód ${cod}? Ela será removida do banco de dados.`))return;
+  const r=await dbDelDraw(cod);if(r.error){alert(r.error.message);return}
+  delete S.draws[cod];render();toast(`Chave do Cód ${cod} apagada`);
+}
+async function apagarTodas(){
+  if(!confirm("Apagar TODAS as chaves sorteadas? Elas serão removidas do banco de dados."))return;
+  const r=await dbDelAllDraws();if(r.error){alert(r.error.message);return}
+  S.draws={};render();toast("Todas as chaves foram apagadas");
 }
 
 /* ---------- CATEGORIAS ---------- */
@@ -171,8 +248,13 @@ function vCategorias(){
 
 /* ---------- SÚMULAS ---------- */
 function vSumulas(){
-  return `<h2>Geração de súmulas</h2>${seg()}<div class="card"><label>Categoria</label><select onchange="setCod(this.value)">${CATEGORIAS.filter(c=>c.mod==cur.mod).map(c=>`<option value="${c.cod}" ${c.cod==cur.cod?"selected":""}>${SEXNOME[c.sexo]} · Cód ${c.cod} · ${nomeCat(c)} (${atletasDe(c.cod).length} atletas)${S.draws[c.cod]?" ✓":""}</option>`).join("")}</select>
-  <p class="hint">As chaves sorteadas ficam salvas no sistema.</p></div>${painel(cur.cod)}`;
+  const disp=CATEGORIAS.filter(c=>atletasDe(c.cod).length>=2).length,feitas=Object.keys(S.draws).length;
+  return `<h2>Geração de súmulas</h2>
+  <div class="card"><h3>Todas as categorias</h3>
+   <p class="hint" style="margin:0 0 4px">${disp} categoria(s) com atletas suficientes · ${feitas} com chave sorteada</p>
+   <div class="bar"><button class="btn" onclick="gerarTodas()">Gerar todas as chaves</button><button class="btn alt" onclick="baixarTodas()" ${feitas?"":"disabled"}>Baixar todas (ZIP com pasta)</button><button class="btn alt" onclick="apagarTodas()" ${feitas?"":"disabled"}>Apagar todas as chaves</button></div></div>
+  ${seg()}<div class="card"><label>Categoria</label><select onchange="setCod(this.value)">${CATEGORIAS.filter(c=>c.mod==cur.mod).map(c=>`<option value="${c.cod}" ${c.cod==cur.cod?"selected":""}>${SEXNOME[c.sexo]} · Cód ${c.cod} · ${nomeCat(c)} (${atletasDe(c.cod).length} atletas)${S.draws[c.cod]?" ✓":""}</option>`).join("")}</select>
+  <p class="hint">As chaves sorteadas ficam salvas no sistema até você apagá-las.</p></div>${painel(cur.cod)}`;
 }
 
 /* ---------- LOGIN / PERFIL ---------- */

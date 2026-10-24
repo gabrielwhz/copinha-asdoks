@@ -7,13 +7,12 @@ function sortear(ids){
   while(i<n)p.push([ids[i++],null]);
   return shuf(p);
 }
-function bracketSVG(pairs,rotulo){
-  const W=200,G=36,ROW=40,PG=14,X0=6;let y=30,ys=[],groups=[],svg="";
-  const ln=(x1,y1,x2,y2)=>svg+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#000" stroke-width="1.4"/>`;
+// Geometria da chave (linhas e textos), usada tanto no SVG da tela quanto nos PDFs
+function bracketGeom(pairs,rotulo){
+  const W=200,G=30,ROW=34,PG=10,X0=6;let y=30,ys=[],groups=[];const lines=[],texts=[];
+  const ln=(x1,y1,x2,y2)=>lines.push([x1,y1,x2,y2]);
   pairs.forEach(p=>{const g=[];
-    p.forEach(id=>{if(!id)return;
-      svg+=`<text x="${X0}" y="${y-5}" font-size="12.5" font-family="Arial">${esc(rotulo(id))}</text>`;
-      ys.push(y);g.push(y);y+=ROW});
+    p.forEach(id=>{if(!id)return;texts.push({x:X0,y:y-5,t:rotulo(id)});ys.push(y);g.push(y);y+=ROW});
     groups.push(g);y+=PG});
   const H=y+10;let r=0;
   for(;;){
@@ -27,6 +26,11 @@ function bracketSVG(pairs,rotulo){
     ys=next;r++;groups=[];
     for(let i=0;i<ys.length;i+=2)groups.push(ys.slice(i,i+2));
   }
-  const w=X0+(r+1)*(W+G)+40;
-  return `<svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${H}" width="${w}" height="${H}"><rect width="100%" height="100%" fill="#fff"/>${svg}</svg>`;
+  return{w:X0+(r+1)*(W+G)+30,h:H,lines,texts};
+}
+function bracketSVG(pairs,rotulo){
+  const g=bracketGeom(pairs,rotulo);
+  return `<svg id="svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.w} ${g.h}" width="${g.w}" height="${g.h}"><rect width="100%" height="100%" fill="#fff"/>`+
+    g.lines.map(l=>`<line x1="${l[0]}" y1="${l[1]}" x2="${l[2]}" y2="${l[3]}" stroke="#000" stroke-width="1.4"/>`).join("")+
+    g.texts.map(t=>`<text x="${t.x}" y="${t.y}" font-size="12.5" font-family="Arial">${esc(t.t)}</text>`).join("")+"</svg>";
 }
